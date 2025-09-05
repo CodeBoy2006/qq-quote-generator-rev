@@ -1,6 +1,5 @@
 #include <litehtml/litehtml.h>
 #include <cairo.h>
-#include <cairo-png.h>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -15,7 +14,7 @@ using json = nlohmann::json;
 using namespace litehtml;
 
 static std::string read_file(const std::string& path) {
-    std::ifstream ifs(path);
+    std::ifstream ifs(path, std::ios::binary);
     std::stringstream ss; ss << ifs.rdbuf();
     return ss.str();
 }
@@ -23,6 +22,7 @@ static std::string read_file(const std::string& path) {
 static void write_file(const std::string& path, const std::string& s) {
     std::ofstream ofs(path, std::ios::binary);
     ofs.write(s.data(), s.size());
+    ofs.close();
 }
 
 static void write_png(const std::string& path, cairo_surface_t* surface) {
@@ -33,20 +33,20 @@ static void write_png(const std::string& path, cairo_surface_t* surface) {
     }
 }
 
-// 递归遍历 DOM，采集 .placeholder 及 avatar 的元素布局
-static void collect_placeholders(litehtml::element::ptr el, std::vector<json>& out, int offset_x=0, int offset_y=0) {
+// Recursively visit DOM to collect .placeholder & avatar-like elements
+static void collect_placeholders(litehtml::element::ptr el, std::vector<json>& out) {
     if(!el) return;
-    // 取属性
-    auto cls = el->get_attr(_t("class"));
-    auto src = el->get_attr(_t("data-src"));
-    auto eltid = el->get_attr(_t("data-eltid"));
 
-    // 位置与尺寸
-    auto pos = el->get_placement(); // litehtml 里 element::get_placement() 返回 position（相对整页）
+    const char* cls   = el->get_attr("class", nullptr);
+    const char* src   = el->get_attr("data-src", nullptr);
+    const char* eltid = el->get_attr("data-eltid", nullptr);
+
+    auto pos = el->get_placement(); // absolute within page
+
     if (cls && std::string(cls).find("placeholder") != std::string::npos) {
         json item;
         item["eltid"] = eltid ? std::string(eltid) : "";
-        item["src"]   = src   ? std::string(src) : "";
+        item["src"]   = src   ? std::string(src)   : "";
         item["x"] = pos.x;
         item["y"] = pos.y;
         item["w"] = pos.width;
@@ -54,9 +54,8 @@ static void collect_placeholders(litehtml::element::ptr el, std::vector<json>& o
         out.push_back(item);
     }
 
-    // avatar 也视作 placeholder（即使没有 class）
+    // Treat data-eltid + data-src elements (e.g., avatars) as placeholders too
     if (eltid && src) {
-        // 模板里给 avatar 也放了 data-src/data-eltid
         json item;
         item["eltid"] = std::string(eltid);
         item["src"]   = std::string(src);
@@ -67,8 +66,8 @@ static void collect_placeholders(litehtml::element::ptr el, std::vector<json>& o
         out.push_back(item);
     }
 
-    for(auto& ch : el->get_children()) {
-        collect_placeholders(ch, out, offset_x + pos.x, offset_y + pos.y);
+    for (auto& ch : el->children()) {
+        collect_placeholders(ch, out);
     }
 }
 
@@ -90,26 +89,25 @@ int main(int argc, char** argv)
 
     std::string html = read_file(in_html);
 
-    // 创建 litehtml 文档
+    // Create litehtml document (UTF-8)
     container_pango_cairo cont(width);
-    auto doc = litehtml::document::createFromString(html.c_str(), &cont, nullptr);
+    auto doc = litehtml::document::createFromString(html, &cont);
 
-    // 先布局
+    // Layout and determine height
     doc->render(width);
-    auto sz = doc->size();
-    int H = std::max(sz.height, 10);
+    int H = std::max(doc->height(), 10);
 
-    // 准备 Cairo surface
+    // Prepare Cairo surface with some padding
     cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width + 20, H + 20);
     cont.attach_surface(surface);
 
-    // 绘制
+    // Draw
     cont.draw(doc);
 
-    // 输出 PNG
+    // Save PNG
     write_png(out_png, surface);
 
-    // 收集占位元素布局
+    // Collect placeholder geometry
     std::vector<json> items;
     collect_placeholders(doc->root(), items);
 
@@ -117,7 +115,7 @@ int main(int argc, char** argv)
     layout["items"] = items;
     write_file(out_json, layout.dump());
 
-    cairo_destroy(cont.cr());
+    // Clean up
     cairo_surface_destroy(surface);
     return 0;
 }

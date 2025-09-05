@@ -11,70 +11,65 @@ RUN apt-get update && \
     nlohmann-json3-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# --- OPTIMIZATION: Build litehtml in its own separate step ---
-# This layer will be cached as long as the git repo URL doesn't change.
-# Subsequent builds will be much faster.
+# Build and install litehtml (cached unless URL/revision changes)
 WORKDIR /opt
 RUN git clone https://github.com/litehtml/litehtml.git && \
     cd litehtml && \
     mkdir build && cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local && \
-    make -j$(nproc) && \
+    make -j"$(nproc)" && \
     make install
 
-# Now, build our application's native renderer
+# Build our native renderer
 WORKDIR /app
 COPY native/ ./native/
 RUN mkdir -p /app/native/build && \
     cd /app/native/build && \
-    cmake .. && \
-    make -j$(nproc)
+    cmake .. -DCMAKE_BUILD_TYPE=Release && \
+    make -j"$(nproc)"
 
 # ======================================================================
 # Stage 2: The Final Production Image
 # ======================================================================
 FROM python:3.11-slim-bullseye
 
-# (The rest of the Dockerfile remains exactly the same as before)
-# ... [Omitted for brevity, no changes needed here] ...
-
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV LITEHTML_RENDER_BIN=/app/litehtml_renderer
 
-# Install runtime dependencies
+# Runtime deps
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libcairo2 libpango-1.0-0 libharfbuzz0b libfontconfig1 \
     fonts-noto-cjk fonts-noto-color-emoji && \
     rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user for security
+# Create non-root user
 RUN useradd -m appuser
 WORKDIR /app
 
-# Copy the compiled binaries and libraries from the builder stage
+# Copy compiled binary and libs from builder
 COPY --from=builder /app/native/build/litehtml_renderer /app/litehtml_renderer
 COPY --from=builder /usr/local/lib/liblitehtml.so* /usr/local/lib/
 
-# Update the dynamic linker cache
+# Update dynamic linker cache
 RUN ldconfig
 
-# Install Python dependencies (copying requirements.txt first for caching)
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Copy the rest of the app
 COPY . .
 
 # Update font cache
 RUN fc-cache -f -v
 
-# Change ownership
+# Ownership
 RUN chown -R appuser:appuser /app
 USER appuser
 
-# Expose port and run
+# Expose & run
 EXPOSE 5000
-CMD ["gunicorn", "--workers", "4", "--bind", "0.-", "main:app"]
+CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:5000", "main:app"]

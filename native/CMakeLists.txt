@@ -10,7 +10,6 @@ pkg_check_modules(PANGOCAIRO REQUIRED pangocairo)
 pkg_check_modules(HARFBUZZ REQUIRED harfbuzz)
 pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
 
-# 尝试find_package，但也要有兜底方案
 find_package(litehtml QUIET)
 if(NOT litehtml_FOUND)
     message(WARNING "litehtml not found by find_package, using fallback includes")
@@ -28,7 +27,7 @@ include_directories(
     ${PANGOCAIRO_INCLUDE_DIRS}
     ${HARFBUZZ_INCLUDE_DIRS}
     ${FONTCONFIG_INCLUDE_DIRS}
-    ${litehtml_INCLUDE_DIRS}  # 使用找到的变量
+    ${litehtml_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
