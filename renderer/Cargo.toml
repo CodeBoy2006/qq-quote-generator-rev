@@ -4,13 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# HTML -> DOM + CSS/布局
-# --- THIS IS THE CORRECTED LINE ---
-# Aligning the version to match the renderer to resolve dependency conflicts.
-blitz-html = "0.1.0-alpha.1"
-
-# 渲染到 PNG 字节缓冲（headless）
-blitz-renderer-vello = "0.1.0-alpha.1"
+# --- CORRECTED AND PINNED BLITZ DEPENDENCIES ---
+# We must pin all related blitz crates to the exact same pre-release version
+# to prevent Cargo from pulling in newer, incompatible transitive dependencies.
+# The "=" is critical for exact version matching.
+blitz-html = "=0.1.0-alpha.1"
+blitz-dom = "=0.1.0-alpha.1"
+blitz-traits = "=0.1.0-alpha.1"
+blitz-renderer-vello = "=0.1.0-alpha.1"
 
 # CLI & 基础
 clap = { version = "4.5", features = ["derive"] }
