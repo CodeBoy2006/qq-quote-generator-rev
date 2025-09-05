@@ -1,14 +1,13 @@
 # =============================================================
 # Stage 1: Build the Rust renderer (headless Blitz HTML)
 # =============================================================
-# --- THIS IS THE CORRECTED LINE ---
-# Use the latest stable Rust toolchain to get support for Edition 2024.
-FROM rust:1.89-bullseye AS rust-builder
+FROM rust:latest-bullseye AS rust-builder
 
 # System deps (minimal)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates pkg-config git build-essential && \
-    rm-rf /var/lib/apt/lists/*
+    # --- THIS IS THE CORRECTED LINE (added a space) ---
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
