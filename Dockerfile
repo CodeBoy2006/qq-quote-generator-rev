@@ -3,22 +3,24 @@
 # ======================================================================
 FROM debian:bullseye AS builder
 
-# Install C++ build dependencies, including git to clone litehtml
+# Install C++ build dependencies, including git and CA certificates for cloning
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     pkg-config \
     git \
+    # --- THIS IS THE FIX ---
+    ca-certificates \
+    # -----------------------
     libcairo2-dev \
     libpango1.0-dev \
     libharfbuzz-dev \
     libfontconfig1-dev \
-    # We remove liblitehtml-dev as we will build from source
     nlohmann-json3-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# --- NEW: Clone and build litehtml from source ---
+# Clone and build litehtml from source
 WORKDIR /opt
 RUN git clone https://github.com/litehtml/litehtml.git && \
     cd litehtml && \
@@ -27,7 +29,6 @@ RUN git clone https://github.com/litehtml/litehtml.git && \
     make -j$(nproc) && \
     make install
 # This installs litehtml headers, libraries, and CMake config to /usr/local
-# ------------------------------------------------
 
 # Copy our native source code
 WORKDIR /app
@@ -45,7 +46,7 @@ RUN mkdir -p /app/native/build && \
 # ======================================================================
 FROM python:3.11-slim-bullseye
 
-# Set environment variables (fixed legacy format)
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV LITEHTML_RENDER_BIN=/app/litehtml_renderer
@@ -53,12 +54,10 @@ ENV LITEHTML_RENDER_BIN=/app/litehtml_renderer
 # Install runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    # Runtime libs for the native renderer
     libcairo2 \
     libpango-1.0-0 \
     libharfbuzz0b \
     libfontconfig1 \
-    # Fonts are crucial for rendering!
     fonts-noto-cjk \
     fonts-noto-color-emoji && \
     rm -rf /var/lib/apt/lists/*
