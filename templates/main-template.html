@@ -1,146 +1,164 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>QQ对话生成界面</title>
-  <style>
-    #app {
-      font-family: 'MiSans', 'OPlusSans 3.0', 'Noto Color Emoji', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Serif Regular', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-      background-color: #F1F1F1;
-      width: auto;
-      padding: 10px;
-      max-width: 800px;
-    }
-    .dialog { display: flex; }
-    p { margin: 0; padding: 0; }
-
-    .avatar {
-      width: 100px; height: 100px; border-radius: 50%;
-      margin: 20px;
-      background: #ddd; /* 占位背景 */
-    }
-
-    .nickname {
-      color: #9497A3;
-      height: 20px;
-      font-size: 25px;
-      padding: 5px;
-      margin: 25px 0 0 0;
-    }
-
-    .body {
-      background-color: #fff;
-      padding: 20px;
-      border-radius: 10px;
-      width: auto;
-      margin: 15px 0 0 0;
-    }
-
-    .reply {
-      background-color: #F5F5F5;
-      padding: 10px;
-      border-radius: 10px;
-      margin-bottom: 10px;
-    }
-    .reply-first { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
-    .reply-first p {
-      font-size: 25px;
-      max-width: 100%;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .reply-first svg { width: 30px; height: 30px; padding-top: 3px; }
-
-    .reply-message {
-      display: block;
-      font-size: 30px;
-      white-space: pre-wrap;
-      /* litehtml 不支持 -webkit-line-clamp；简单以最大高度近似 */
-      max-height: 3.2em; overflow: hidden;
-    }
-
-    .message {
-      margin: 0;
-      font-size: 35px;
-      word-break: break-word;
-      white-space: pre-wrap;
-
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .single-image {
-      margin: 10px 20px 20px 0;
-      border-radius: 15px;
-      width: 500px; height: 500px; /* 占位固定尺寸（像素） */
-      background: #e6e6e6;
-    }
-
-    .image {
-      margin: 10px;
-      border-radius: 15px;
-      width: 500px; height: 500px; /* 作为占位尺寸 */
-      background: #e6e6e6;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QQ对话生成界面</title>
 </head>
+
 <body>
-<div id="app">
-  {% for block in data_list %}
-  <div class="dialog">
-    <img class="avatar" alt="avatar"
-         data-src="https://q1.qlogo.cn/g?b=qq&nk={{block.user_id}}&s=640"
-         data-eltid="avatar-{{loop.index0}}"/>
-
-    <div>
-      <p class="nickname">{{block.user_nickname}}</p>
-
-      {% if block.image is defined and block.image|length == 1 and block.message is not defined and block.reply is not defined %}
-        <div class="single-image placeholder"
-             data-src="{{block.image[0]}}"
-             data-eltid="img-{{loop.index0}}-0"></div>
-      {% else %}
-      <div class="body">
-        {% if block.reply is defined %}
-        <div class="reply">
-          <div class="reply-first">
-            <p>{{block.reply.user_nickname}}</p>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
-                 viewBox="0 0 16 16"><path fill="currentColor"
-                 d="M3.5 2a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9Zm4.854 2.146a.5.5 0 0 0-.708 0l-3.5 3.5a.5.5 0 1 0 .708.708L7.5 5.707V13.5a.5.5 0 0 0 1 0V5.707l2.646 2.647a.5.5 0 0 0 .708-.708l-3.5-3.5Z"/></svg>
-          </div>
-          <div>
-            {% if block.reply.message is defined %}
-            <p class="reply-message">{{block.reply.message}}</p>
-            {% endif %}
-            {% if block.reply.image is defined %}
-            <div class="image placeholder"
-                 data-src="{{block.reply.image}}"
-                 data-eltid="replyimg-{{loop.index0}}"></div>
-            {% endif %}
-          </div>
+    <div id="app">
+        {% for index in data_list %}
+        <div class="dialog">
+            <img src="https://q1.qlogo.cn/g?b=qq&nk={{index.user_id}}&s=640" class="avatar"></img>
+            <div>
+                <p class="nickname">{{index.user_nickname}}</p>
+                {% if index.image | length == 1 and index.message is not defined and index.reply is not defined %}
+                        <img src="{{index.image[0]}}" class="single-image"></img>
+                {% else %}
+                <div class="body">
+                    {% if index.reply is defined %}
+                    <div class="reply">
+                        <div class="reply-first">
+                            <p>{{index.reply.user_nickname}}</p>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="currentColor" d="M3.5 2a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9Zm4.854 2.146a.5.5 0 0 0-.708 0l-3.5 3.5a.5.5 0 1 0 .708.708L7.5 5.707V13.5a.5.5 0 0 0 1 0V5.707l2.646 2.647a.5.5 0 0 0 .708-.708l-3.5-3.5Z"/></svg>
+                        </div>
+                        <div>
+                            {% if index.reply.message is defined %}
+                            <p class="reply-message">{{index.reply.message}}</p>
+                            {% endif %}
+                            {% if index.reply.image is defined %}
+                            <img src="{{index.reply.image}}" class="image"></img>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="message">
+                        {% if index.message is defined %}
+                        <p style="display: inline-block;">{{index.message}}</p>
+                        {% endif %}
+                        {% if index.image is defined %}
+                        {% for image in index.image %}
+                        <img src="{{image}}" class="image"></img>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
         </div>
-        {% endif %}
-
-        <div class="message">
-          {% if block.message is defined %}
-          <p style="display:inline-block">{{block.message}}</p>
-          {% endif %}
-
-          {% if block.image is defined %}
-          {% for image in block.image %}
-          <div class="image placeholder"
-               data-src="{{image}}"
-               data-eltid="img-{{loop.parent.loop.index0}}-{{loop.index0}}"></div>
-          {% endfor %}
-          {% endif %}
-        </div>
-      </div>
-      {% endif %}
+        {% endfor %}
     </div>
-  </div>
-  {% endfor %}
-</div>
+
+
+    <style>
+        #app {
+            font-family: 'MiSans', 'OPlusSans 3.0', 'Noto Color Emoji', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Serif Regular', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #F1F1F1;
+            width: fit-content;
+            padding: 10px;
+            max-width: 800px;
+        }
+
+        .dialog {
+            display: flex;
+        }
+
+        p {
+            margin: 0;
+            padding: 0;
+        }
+
+        .avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 20px;
+        }
+
+        .nickname {
+            color: #9497A3;
+            height: 20px;
+            font-size: 25px;
+            padding: 5px;
+            margin: 25px;
+            margin-left: 0px;
+        }
+
+        .body {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: fit-content;
+            margin: 15px;
+            margin-left: 0;
+        }
+
+        .reply {
+            background-color: #F5F5F5;
+            padding: 10px;
+            border-radius: 10px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .reply-first {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .reply-first p {
+            float: left;
+            font-size: 25px;
+            max-width: inherit;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .reply-first svg {
+            width: 30px;
+            height: 30px;
+            padding-top: 3px;
+        }
+
+        .reply-message {
+            display: block;
+            font-size: 30px;
+            white-space: pre-wrap;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .message {
+            margin: 0;
+            font-size: 35px;
+            display: grid;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        .single-image {
+            margin: 10px 20px 20px 0;
+            border-radius: 15px;
+            max-width: 500px;
+            max-height: 500px;
+        }
+
+        .image {
+            margin: 10px;
+            border-radius: 15px;
+            max-width: 500px;
+            max-height: 500px;
+        }
+    </style>
 </body>
+
 </html>
