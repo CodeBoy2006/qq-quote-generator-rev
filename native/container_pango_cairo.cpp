@@ -1,5 +1,4 @@
 #include "container_pango_cairo.h"
-#include <cstring>
 #include <cmath>
 
 using namespace litehtml;
@@ -9,8 +8,7 @@ container_pango_cairo::container_pango_cairo(int viewport_w)
 
 container_pango_cairo::~container_pango_cairo() {
     if (m_cr) { cairo_destroy(m_cr); m_cr = nullptr; }
-    // m_surface is owned by the caller; do not destroy here
-    m_surface = nullptr;
+    m_surface = nullptr; // not owned
 }
 
 void container_pango_cairo::attach_surface(cairo_surface_t* surf) {
@@ -24,15 +22,14 @@ Size container_pango_cairo::get_surface_size() const {
                  cairo_image_surface_get_height(m_surface) };
 }
 
-int container_pango_cairo::pt_to_px(int pt) const {
+pixel_t container_pango_cairo::pt_to_px(float pt) const {
     // 96 DPI: 1pt = 96/72 px
-    return int(std::round(pt * 96.0 / 72.0));
+    return static_cast<pixel_t>(pt * 96.0f / 72.0f);
 }
 
 void container_pango_cairo::get_media_features(media_features& media) const {
-    // Keep it simple; sufficient for CSS media queries
     media.width         = m_viewport_w;
-    media.height        = 0;      // auto
+    media.height        = 0;
     media.device_width  = m_viewport_w;
     media.device_height = 0;
     media.color         = 8;
@@ -41,14 +38,15 @@ void container_pango_cairo::get_media_features(media_features& media) const {
     media.resolution    = 96;
 }
 
-litehtml::uint_ptr container_pango_cairo::create_font(const char* faceName, int size,
-    int weight, font_style italic, unsigned int /*decoration*/, font_metrics* fm)
+litehtml::uint_ptr container_pango_cairo::create_font(const font_description& descr,
+                                                      const litehtml::document* /*doc*/,
+                                                      font_metrics* fm)
 {
     auto* fh = new font_handle{
-        std::string(faceName ? faceName : "Sans"),
-        pt_to_px(size),
-        weight,
-        italic == font_style_italic
+        descr.family.empty() ? std::string("Sans") : descr.family,
+        static_cast<int>(std::round(descr.size)),
+        descr.weight,
+        descr.style == font_style_italic
     };
 
     PangoLayout* layout = pango_cairo_create_layout(m_cr);
@@ -74,12 +72,11 @@ litehtml::uint_ptr container_pango_cairo::create_font(const char* faceName, int 
 }
 
 void container_pango_cairo::delete_font(uint_ptr hFont) {
-    auto* fh = (font_handle*) hFont;
-    delete fh;
+    delete static_cast<font_handle*>(reinterpret_cast<void*>(hFont));
 }
 
-int container_pango_cairo::text_width(const char* text, uint_ptr hFont) {
-    auto* fh = (font_handle*) hFont;
+pixel_t container_pango_cairo::text_width(const char* text, uint_ptr hFont) {
+    auto* fh = static_cast<font_handle*>(reinterpret_cast<void*>(hFont));
     PangoLayout* layout = pango_cairo_create_layout(m_cr);
     std::string desc = fh->family + " " + std::to_string(fh->size_px) + "px";
     PangoFontDescription* fd = pango_font_description_from_string(desc.c_str());
@@ -91,13 +88,13 @@ int container_pango_cairo::text_width(const char* text, uint_ptr hFont) {
     pango_layout_get_pixel_size(layout, &w, &h);
     g_object_unref(layout);
     pango_font_description_free(fd);
-    return w;
+    return static_cast<pixel_t>(w);
 }
 
 void container_pango_cairo::draw_text(uint_ptr /*hdc*/, const char* text, uint_ptr hFont,
-    web_color color, const position& pos)
+    const web_color color, const position& pos)
 {
-    auto* fh = (font_handle*) hFont;
+    auto* fh = static_cast<font_handle*>(reinterpret_cast<void*>(hFont));
     cairo_save(m_cr);
     cairo_set_source_rgba(m_cr, color.red/255.0, color.green/255.0, color.blue/255.0, color.alpha/255.0);
     PangoLayout* layout = pango_cairo_create_layout(m_cr);
@@ -115,23 +112,29 @@ void container_pango_cairo::draw_text(uint_ptr /*hdc*/, const char* text, uint_p
     cairo_restore(m_cr);
 }
 
-static inline void _rgba(cairo_t* cr, const litehtml::web_color& c) {
+static inline void _rgba(cairo_t* cr, const web_color& c) {
     cairo_set_source_rgba(cr, c.red/255.0, c.green/255.0, c.blue/255.0, c.alpha/255.0);
 }
 
-void container_pango_cairo::draw_solid_fill(uint_ptr, const position& pos, const web_color color)
+void container_pango_cairo::draw_solid_fill(uint_ptr /*hdc*/,
+                                            const background_layer& /*layer*/,
+                                            const web_color& color)
 {
+    // Minimal impl: use full-surface fill when used for page bg.
+    // For per-element backgrounds, litehtml will call us with specific layers,
+    // but we keep it conservative to avoid relying on internals.
     if(color.alpha == 0) return;
     cairo_save(m_cr);
     _rgba(m_cr, color);
-    cairo_rectangle(m_cr, pos.x, pos.y, pos.width, pos.height);
+    auto s = get_surface_size();
+    cairo_rectangle(m_cr, 0, 0, s.width, s.height);
     cairo_fill(m_cr);
     cairo_restore(m_cr);
 }
 
 void container_pango_cairo::draw_borders(uint_ptr, const borders& /*b*/, const position& draw_pos, bool /*root*/)
 {
-    // Minimal borders: draw a simple solid rect around draw_pos (no radii/styles)
+    // Draw a simple 1px border rectangle (no radii/styles)
     cairo_save(m_cr);
     cairo_set_line_width(m_cr, 1.0);
     cairo_set_source_rgba(m_cr, 0, 0, 0, 1.0);
@@ -140,14 +143,14 @@ void container_pango_cairo::draw_borders(uint_ptr, const borders& /*b*/, const p
     cairo_restore(m_cr);
 }
 
-void container_pango_cairo::draw(litehtml::document::ptr& doc)
+void container_pango_cairo::draw(document::ptr& doc)
 {
-    // Clear background
+    // Clear to light gray
     cairo_save(m_cr);
     cairo_set_source_rgba(m_cr, 0.945, 0.945, 0.945, 1.0); // #F1F1F1
     cairo_paint(m_cr);
     cairo_restore(m_cr);
 
-    // New draw signature: (hdc, x, y, clip)
+    // New draw: (hdc, x, y, clip)
     doc->draw((uint_ptr)this, 0, 0, nullptr);
 }

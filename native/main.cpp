@@ -33,7 +33,6 @@ static void write_png(const std::string& path, cairo_surface_t* surface) {
     }
 }
 
-// Recursively visit DOM to collect .placeholder & avatar-like elements
 static void collect_placeholders(litehtml::element::ptr el, std::vector<json>& out) {
     if(!el) return;
 
@@ -41,7 +40,7 @@ static void collect_placeholders(litehtml::element::ptr el, std::vector<json>& o
     const char* src   = el->get_attr("data-src", nullptr);
     const char* eltid = el->get_attr("data-eltid", nullptr);
 
-    auto pos = el->get_placement(); // absolute within page
+    auto pos = el->get_placement(); // absolute position within page
 
     if (cls && std::string(cls).find("placeholder") != std::string::npos) {
         json item;
@@ -54,7 +53,6 @@ static void collect_placeholders(litehtml::element::ptr el, std::vector<json>& o
         out.push_back(item);
     }
 
-    // Treat data-eltid + data-src elements (e.g., avatars) as placeholders too
     if (eltid && src) {
         json item;
         item["eltid"] = std::string(eltid);
@@ -89,15 +87,15 @@ int main(int argc, char** argv)
 
     std::string html = read_file(in_html);
 
-    // Create litehtml document (UTF-8)
     container_pango_cairo cont(width);
     auto doc = litehtml::document::createFromString(html, &cont);
 
-    // Layout and determine height
+    // Layout and determine height (pixel_t in newer litehtml)
     doc->render(width);
-    int H = std::max(doc->height(), 10);
+    auto Hf = doc->height();
+    int H = std::max<int>(static_cast<int>(std::ceil(Hf)), 10);
 
-    // Prepare Cairo surface with some padding
+    // Create Cairo surface with some padding
     cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width + 20, H + 20);
     cont.attach_surface(surface);
 
@@ -115,7 +113,6 @@ int main(int argc, char** argv)
     layout["items"] = items;
     write_file(out_json, layout.dump());
 
-    // Clean up
     cairo_surface_destroy(surface);
     return 0;
 }
