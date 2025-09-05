@@ -30,15 +30,6 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    # Install fonts
-    fonts-noto-cjk \
-    fonts-noto-color-emoji \
-    # Clean up to reduce image size
-    && apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-    
 WORKDIR /app
 
 # 复制依赖文件
