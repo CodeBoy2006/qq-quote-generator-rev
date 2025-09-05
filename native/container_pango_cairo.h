@@ -1,5 +1,5 @@
 #pragma once
-#include <litehtml.h>
+#include <litehtml/litehtml.h>
 #include <cairo.h>
 #include <pango/pangocairo.h>
 #include <string>

@@ -10,43 +10,45 @@ pkg_check_modules(PANGOCAIRO REQUIRED pangocairo)
 pkg_check_modules(HARFBUZZ REQUIRED harfbuzz)
 pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
 
-# --- CHANGED ---
-# We no longer use pkg-config for litehtml.
-# find_package can find libraries installed from source.
-find_package(litehtml REQUIRED)
-# ---------------
+# 尝试find_package，但也要有兜底方案
+find_package(litehtml QUIET)
+if(NOT litehtml_FOUND)
+    message(WARNING "litehtml not found by find_package, using fallback includes")
+    set(litehtml_INCLUDE_DIRS
+        /usr/local/include
+        /usr/local/include/litehtml
+    )
+    set(litehtml_LIBRARIES litehtml)
+else()
+    message(STATUS "litehtml found by find_package")
+endif()
 
 include_directories(
-  ${CAIRO_INCLUDE_DIRS}
-  ${PANGOCAIRO_INCLUDE_DIRS}
-  ${HARFBUZZ_INCLUDE_DIRS}
-  ${FONTCONFIG_INCLUDE_DIRS}
-  # The find_package command sets litehtml_INCLUDE_DIRS
-  ${litehtml_INCLUDE_DIRS}
-  ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CAIRO_INCLUDE_DIRS}
+    ${PANGOCAIRO_INCLUDE_DIRS}
+    ${HARFBUZZ_INCLUDE_DIRS}
+    ${FONTCONFIG_INCLUDE_DIRS}
+    ${litehtml_INCLUDE_DIRS}  # 使用找到的变量
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# link_directories is often not needed if find_package is used correctly,
-# but we'll keep it for robustness.
 link_directories(
-  ${CAIRO_LIBRARY_DIRS}
-  ${PANGOCAIRO_LIBRARY_DIRS}
-  ${HARFBUZZ_LIBRARY_DIRS}
-  ${FONTCONFIG_LIBRARY_DIRS}
-  # The find_package command sets litehtml_LIBRARY_DIRS
-  ${litehtml_LIBRARY_DIRS}
+    ${CAIRO_LIBRARY_DIRS}
+    ${PANGOCAIRO_LIBRARY_DIRS}
+    ${HARFBUZZ_LIBRARY_DIRS}
+    ${FONTCONFIG_LIBRARY_DIRS}
+    ${litehtml_LIBRARY_DIRS}
 )
 
 add_executable(litehtml_renderer
-  main.cpp
-  container_pango_cairo.cpp
+    main.cpp
+    container_pango_cairo.cpp
 )
 
 target_link_libraries(litehtml_renderer
-  ${CAIRO_LIBRARIES}
-  ${PANGOCAIRO_LIBRARIES}
-  ${HARFBUZZ_LIBRARIES}
-  ${FONTCONFIG_LIBRARIES}
-  # The find_package command sets litehtml_LIBRARIES
-  ${litehtml_LIBRARIES}
+    ${CAIRO_LIBRARIES}
+    ${PANGOCAIRO_LIBRARIES}
+    ${HARFBUZZ_LIBRARIES}
+    ${FONTCONFIG_LIBRARIES}
+    ${litehtml_LIBRARIES}
 )

@@ -1,4 +1,4 @@
-#include <litehtml.h>
+#include <litehtml/litehtml.h>
 #include <cairo.h>
 #include <cairo-png.h>
 #include <fstream>
@@ -7,7 +7,7 @@
 #include <vector>
 #include <cstring>
 #include <iostream>
-#include <nlohmann/json.hpp> // 你也可以换成手写 JSON；这里为清晰起见建议引入（若无则改成手写）
+#include <nlohmann/json.hpp>
 
 #include "container_pango_cairo.h"
 
