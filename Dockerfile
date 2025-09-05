@@ -1,24 +1,22 @@
 # =============================================================
 # Stage 1: Build the Rust renderer (headless Blitz HTML)
 # =============================================================
-FROM rust:1.80-bullseye AS rust-builder
+# --- THIS IS THE CORRECTED LINE ---
+# Use the latest stable Rust toolchain to get support for Edition 2024.
+FROM rust:latest-bullseye AS rust-builder
 
 # System deps (minimal)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates pkg-config git build-essential && \
-    rm -rf /var/lib/apt/lists/*
+    rm-rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
-# --- CORRECTED CACHING STRATEGY ---
-
-# 1. Copy only the manifest file. This layer is cached as long
-#    as Cargo.toml doesn't change.
+# --- CACHING STRATEGY ---
+# 1. Copy only the manifest file.
 COPY renderer/Cargo.toml ./renderer/
 
 # 2. Create a dummy main.rs and fetch dependencies.
-#    This builds the dependency cache and generates Cargo.lock inside the image.
-#    It's faster on subsequent builds.
 WORKDIR /build/renderer
 RUN mkdir src && \
     printf "fn main() {}" > src/main.rs && \
@@ -27,7 +25,7 @@ RUN mkdir src && \
 # 3. Now copy the actual source code.
 COPY renderer/src ./src
 
-# 4. Build the release binary. This will be fast as all dependencies are cached.
+# 4. Build the release binary.
 RUN cargo build --release
 
 
