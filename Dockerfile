@@ -1,74 +1,63 @@
-# ======================================================================
-# Stage 1: Builder
-# ======================================================================
-FROM debian:bullseye AS builder
+# =============================================================
+# Stage 1: Build the Rust renderer (headless Blitz HTML)
+# =============================================================
+FROM rust:1.80-bullseye AS rust-builder
 
-# Build deps
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      build-essential cmake pkg-config git ca-certificates \
-      libcairo2-dev libpango1.0-dev libharfbuzz-dev libfontconfig1-dev \
-      nlohmann-json3-dev && \
+# System deps (minimal). We keep it small: cargo does the heavy lifting.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates pkg-config git build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# ---- Build litehtml from a known commit and keep it local (static) ----
-# Using --depth=1 + a stable commit avoids layer drift. Replace the commit
-# with another if you need to, but keep it pinned.
-WORKDIR /opt
-RUN git clone --depth=1 https://github.com/litehtml/litehtml.git
-WORKDIR /opt/litehtml
-RUN mkdir build && cd build && \
-    cmake .. \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DLITEHTML_UTF8=ON \
-      -DBUILD_SHARED_LIBS=OFF && \
-    make -j"$(nproc)"
+WORKDIR /build
 
-# ---- Build our native renderer against that exact litehtml ----
-WORKDIR /app
-ENV LITEHTML_DIR=/opt/litehtml
-COPY native/ ./native/
-RUN mkdir -p /app/native/build && cd /app/native/build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DLITEHTML_DIR="$LITEHTML_DIR" && \
-    make -j"$(nproc)"
+# Create a cached layer for dependencies
+COPY renderer/Cargo.toml renderer/Cargo.lock ./renderer/
+RUN mkdir -p renderer/src && printf "fn main(){}" > renderer/src/main.rs && \
+    cd renderer && cargo fetch
 
-# ======================================================================
-# Stage 2: Runtime
-# ======================================================================
+# Now copy real source and build release
+COPY renderer/src ./renderer/src
+WORKDIR /build/renderer
+RUN cargo build --release
+
+# =============================================================
+# Stage 2: Final production image (Python app + our renderer)
+# =============================================================
 FROM python:3.11-slim-bullseye
 
+# Environment
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV LITEHTML_RENDER_BIN=/app/litehtml_renderer
 
-# Runtime libs (no litehtml needed because we linked it statically)
+# Runtime libs for fonts (Blitz uses system fonts via fontconfig)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      libcairo2 libpango-1.0-0 libharfbuzz0b libfontconfig1 \
-      fonts-noto-cjk fonts-noto-color-emoji && \
+    libfontconfig1 libfreetype6 \
+    fonts-noto-cjk fonts-noto-color-emoji && \
     rm -rf /var/lib/apt/lists/*
 
-# App user & workspace
+# Non-root user
 RUN useradd -m appuser
 WORKDIR /app
 
-# Copy renderer binary from builder
-COPY --from=builder /app/native/build/litehtml_renderer /app/litehtml_renderer
+# Copy renderer binary (keep the original name/path to avoid app changes)
+COPY --from=rust-builder /build/renderer/target/release/litehtml_renderer /app/litehtml_renderer
 
-# Python deps
+# Python deps layer (cache-friendly)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # App code
 COPY . .
 
-# Fonts cache
+# Refresh font cache
 RUN fc-cache -f -v
 
-# Ownership & user
+# Ownership & runtime
 RUN chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 5000
-# (Fix the bind target)
+# NOTE: 修正原 CMD 里的绑定地址笔误为 0.0.0.0:5000
 CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:5000", "main:app"]

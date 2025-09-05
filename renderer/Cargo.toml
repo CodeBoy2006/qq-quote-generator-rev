@@ -1,0 +1,20 @@
+[package]
+name = "litehtml_renderer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# HTML -> DOM + CSS/布局
+blitz-html = "0.1"                        # HtmlDocument, from_html, selectors/resolution
+# 渲染到 PNG 字节缓冲（headless）
+blitz-renderer-vello = "0.1.0-alpha.1"    # render_to_buffer(..) -> Vec<u8>
+# CLI & 基础
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# 同步阻塞异步函数（避免引入完整 async runtime）
+pollster = "0.4"
+
+# 可选：写文件时确保目录存在
+fs_err = "2.11"
