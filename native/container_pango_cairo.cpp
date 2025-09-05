@@ -1,5 +1,6 @@
 #include "container_pango_cairo.h"
 #include <cmath>
+#include <cstring>
 
 using namespace litehtml;
 
@@ -60,9 +61,9 @@ litehtml::uint_ptr container_pango_cairo::create_font(const font_description& de
     int w=0,h=0;
     pango_layout_get_pixel_size(layout, &w, &h);
 
-    fm->ascent  = std::round(h * 0.8f);
-    fm->descent = h - fm->ascent;
-    fm->height  = h;
+    fm->ascent   = std::round(h * 0.8f);
+    fm->descent  = h - fm->ascent;
+    fm->height   = h;
     fm->x_height = std::round(h * 0.5f);
 
     g_object_unref(layout);
@@ -120,9 +121,6 @@ void container_pango_cairo::draw_solid_fill(uint_ptr /*hdc*/,
                                             const background_layer& /*layer*/,
                                             const web_color& color)
 {
-    // Minimal impl: use full-surface fill when used for page bg.
-    // For per-element backgrounds, litehtml will call us with specific layers,
-    // but we keep it conservative to avoid relying on internals.
     if(color.alpha == 0) return;
     cairo_save(m_cr);
     _rgba(m_cr, color);
@@ -134,7 +132,6 @@ void container_pango_cairo::draw_solid_fill(uint_ptr /*hdc*/,
 
 void container_pango_cairo::draw_borders(uint_ptr, const borders& /*b*/, const position& draw_pos, bool /*root*/)
 {
-    // Draw a simple 1px border rectangle (no radii/styles)
     cairo_save(m_cr);
     cairo_set_line_width(m_cr, 1.0);
     cairo_set_source_rgba(m_cr, 0, 0, 0, 1.0);
@@ -143,9 +140,31 @@ void container_pango_cairo::draw_borders(uint_ptr, const borders& /*b*/, const p
     cairo_restore(m_cr);
 }
 
+void container_pango_cairo::split_text(const char* text,
+                                       const std::function<void(const char*)>& on_word,
+                                       const std::function<void(const char*)>& on_delim)
+{
+    // A tiny UTF-8-safe-ish splitter: treat spaces/tabs/newlines as delimiters.
+    if (!text) return;
+    const char* p = text;
+    while (*p) {
+        // delimiters
+        if (*p==' ' || *p=='\t' || *p=='\n' || *p=='\r') {
+            const char buf[2] = {*p, '\0'};
+            on_delim(buf);
+            ++p;
+            continue;
+        }
+        // word
+        const char* start = p;
+        while (*p && *p!=' ' && *p!='\t' && *p!='\n' && *p!='\r') ++p;
+        std::string w(start, p - start);
+        on_word(w.c_str());
+    }
+}
+
 void container_pango_cairo::draw(document::ptr& doc)
 {
-    // Clear to light gray
     cairo_save(m_cr);
     cairo_set_source_rgba(m_cr, 0.945, 0.945, 0.945, 1.0); // #F1F1F1
     cairo_paint(m_cr);
