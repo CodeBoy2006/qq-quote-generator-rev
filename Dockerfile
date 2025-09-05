@@ -3,22 +3,33 @@
 # =============================================================
 FROM rust:1.80-bullseye AS rust-builder
 
-# System deps (minimal). We keep it small: cargo does the heavy lifting.
+# System deps (minimal)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates pkg-config git build-essential && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
-# Create a cached layer for dependencies
-COPY renderer/Cargo.toml renderer/Cargo.lock ./renderer/
-RUN mkdir -p renderer/src && printf "fn main(){}" > renderer/src/main.rs && \
-    cd renderer && cargo fetch
+# --- CORRECTED CACHING STRATEGY ---
 
-# Now copy real source and build release
-COPY renderer/src ./renderer/src
+# 1. Copy only the manifest file. This layer is cached as long
+#    as Cargo.toml doesn't change.
+COPY renderer/Cargo.toml ./renderer/
+
+# 2. Create a dummy main.rs and fetch dependencies.
+#    This builds the dependency cache and generates Cargo.lock inside the image.
+#    It's faster on subsequent builds.
 WORKDIR /build/renderer
+RUN mkdir src && \
+    printf "fn main() {}" > src/main.rs && \
+    cargo fetch
+
+# 3. Now copy the actual source code.
+COPY renderer/src ./src
+
+# 4. Build the release binary. This will be fast as all dependencies are cached.
 RUN cargo build --release
+
 
 # =============================================================
 # Stage 2: Final production image (Python app + our renderer)
@@ -59,5 +70,5 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 5000
-# NOTE: 修正原 CMD 里的绑定地址笔误为 0.0.0.0:5000
+# NOTE: Corrected original typo in bind address to 0.0.0.0:5000
 CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:5000", "main:app"]
