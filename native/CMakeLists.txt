@@ -22,8 +22,9 @@ set(LITEHTML_STATIC_LIB  "${LITEHTML_DIR}/build/liblitehtml.a")
 if (NOT EXISTS "${LITEHTML_STATIC_LIB}")
   message(FATAL_ERROR "Static library not found at ${LITEHTML_STATIC_LIB}")
 endif()
-if (NOT EXISTS "${LITEHTML_INCLUDE_DIR}/litehtml/litehtml.h")
-    message(FATAL_ERROR "Header not found at ${LITEHTML_INCLUDE_DIR}/litehtml/litehtml.h")
+# FIX: The header is directly in the include dir, not in a 'litehtml' subdirectory.
+if (NOT EXISTS "${LITEHTML_INCLUDE_DIR}/litehtml.h")
+    message(FATAL_ERROR "Header not found at ${LITEHTML_INCLUDE_DIR}/litehtml.h")
 endif()
 
 # Define our executable
@@ -33,6 +34,7 @@ add_executable(litehtml_renderer
 )
 
 # ---- Directly add include paths and link the library file ----
+# Adding LITEHTML_INCLUDE_DIR allows #include "litehtml.h" to work.
 target_include_directories(litehtml_renderer PRIVATE
     ${LITEHTML_INCLUDE_DIR}
     ${CAIRO_INCLUDE_DIRS}
