@@ -1,7 +1,7 @@
 # =============================================================
 # Stage 1: Build the Rust renderer (headless Blitz HTML)
 # =============================================================
-FROM rust:latest-bullseye AS rust-builder
+FROM rust:1.89-bullseye AS rust-builder
 
 # System deps (minimal)
 RUN apt-get update && apt-get install -y --no-install-recommends \
