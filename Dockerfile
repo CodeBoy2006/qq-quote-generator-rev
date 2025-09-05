@@ -1,15 +1,35 @@
-# Use a slim Python base image which is Debian-based
 FROM python:3.11-slim
 
-# Set the working directory inside the container
-WORKDIR /app
+# 安装 Playwright 所需的系统依赖
+RUN apt-get update && apt-get install -y \
+    wget \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libatspi2.0-0 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libx11-6 \
+    libxcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set environment variables to prevent interactive prompts during installation
-ENV DEBIAN_FRONTEND=noninteractive \
-    PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
-
-# Install system dependencies, including Chinese fonts and emoji fonts
-# This is the key fix for the font issue
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     # Install fonts
@@ -18,22 +38,21 @@ RUN apt-get update && \
     # Clean up to reduce image size
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+    
+WORKDIR /app
 
-# Copy only the requirements file first to leverage Docker's layer cache
+# 复制依赖文件
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code into the container
+# 安装 Playwright 浏览器
+RUN python -m playwright install chromium
+
+# 复制应用代码
 COPY . .
 
-# Install Playwright browser and its Linux dependencies
-# Running this as part of the build is more reliable than at runtime
-RUN python setup_playwright.py
-
-# Expose the port the app runs on
+# 暴露端口
 EXPOSE 5000
 
-# Set the command to run the application using gunicorn for better performance, as recommended in the README
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "main:app"]
+# 启动应用
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "main:app", "--workers", "1", "--threads", "4", "--timeout", "120"]
