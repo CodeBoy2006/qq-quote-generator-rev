@@ -3,7 +3,7 @@
 # =============================================================
 # --- THIS IS THE CORRECTED LINE ---
 # Use the latest stable Rust toolchain to get support for Edition 2024.
-FROM rust:latest-bullseye AS rust-builder
+FROM rust:1.89-bullseye AS rust-builder
 
 # System deps (minimal)
 RUN apt-get update && apt-get install -y --no-install-recommends \
