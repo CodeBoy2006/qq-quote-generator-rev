@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>QQ对话生成界面</title>
 </head>
 
@@ -14,8 +14,13 @@
             <img src="https://q1.qlogo.cn/g?b=qq&nk={{index.user_id}}&s=640" class="avatar"></img>
             <div>
                 <p class="nickname">{{index.user_nickname}}</p>
-                {% if index.image | length == 1 and index.message is not defined and index.reply is not defined %}
-                        <img src="{{index.image[0]}}" class="single-image"></img>
+
+                {% if index.image is defined
+                      and index.image|length == 1
+                      and index.message is not defined
+                      and index.reply is not defined
+                      and (index.image[0] is string) %}
+                    <img src="{{index.image[0]}}" class="single-image"></img>
                 {% else %}
                 <div class="body">
                     {% if index.reply is defined %}
@@ -26,22 +31,32 @@
                         </div>
                         <div>
                             {% if index.reply.message is defined %}
-                            <p class="reply-message">{{index.reply.message}}</p>
+                                <p class="reply-message">{{index.reply.message}}</p>
                             {% endif %}
                             {% if index.reply.image is defined %}
-                            <img src="{{index.reply.image}}" class="image"></img>
+                                <img src="{{index.reply.image}}" class="image"></img>
                             {% endif %}
                         </div>
                     </div>
                     {% endif %}
+
                     <div class="message">
                         {% if index.message is defined %}
-                        <p style="display: inline-block;">{{index.message}}</p>
+                            <p style="display: inline-block;">{{index.message}}</p>
                         {% endif %}
+
                         {% if index.image is defined %}
-                        {% for image in index.image %}
-                        <img src="{{image}}" class="image"></img>
-                        {% endfor %}
+                            {% for image in index.image %}
+                                {% if image is string %}
+                                    <img src="{{image}}" class="image"></img>
+                                {% else %}
+                                    <!-- 动图占位符（事件驱动合成时替换） -->
+                                    <div class="image placeholder"
+                                         data-anim-id="{{image.id}}"
+                                         style="width: {{image.width}}px; height: {{image.height}}px; border-radius: 15px;">
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
                         {% endif %}
                     </div>
                 </div>
@@ -50,7 +65,6 @@
         </div>
         {% endfor %}
     </div>
-
 
     <style>
         #app {
@@ -61,104 +75,45 @@
             max-width: 800px;
         }
 
-        .dialog {
-            display: flex;
-        }
-
-        p {
-            margin: 0;
-            padding: 0;
-        }
+        .dialog { display: flex; }
+        p { margin: 0; padding: 0; }
 
         .avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            margin: 20px;
+            width: 100px; height: 100px; border-radius: 50%; margin: 20px;
         }
 
         .nickname {
-            color: #9497A3;
-            height: 20px;
-            font-size: 25px;
-            padding: 5px;
-            margin: 25px;
-            margin-left: 0px;
+            color: #9497A3; height: 20px; font-size: 25px; padding: 5px;
+            margin: 25px; margin-left: 0px;
         }
 
         .body {
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            width: fit-content;
-            margin: 15px;
-            margin-left: 0;
+            background-color: white; padding: 20px; border-radius: 10px;
+            width: fit-content; margin: 15px; margin-left: 0;
         }
 
         .reply {
-            background-color: #F5F5F5;
-            padding: 10px;
-            border-radius: 10px;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
+            background-color: #F5F5F5; padding: 10px; border-radius: 10px;
+            align-items: center; justify-content: space-between; margin-bottom: 10px;
         }
 
-        .reply-first {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 5px;
-        }
-
-        .reply-first p {
-            float: left;
-            font-size: 25px;
-            max-width: inherit;
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-        }
-
-        .reply-first svg {
-            width: 30px;
-            height: 30px;
-            padding-top: 3px;
-        }
+        .reply-first { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+        .reply-first p { float: left; font-size: 25px; max-width: inherit; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .reply-first svg { width: 30px; height: 30px; padding-top: 3px; }
 
         .reply-message {
-            display: block;
-            font-size: 30px;
-            white-space: pre-wrap;
-            display: -webkit-box;
-            -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            display: block; font-size: 30px; white-space: pre-wrap; display: -webkit-box;
+            -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-overflow: ellipsis;
         }
 
-        .message {
-            margin: 0;
-            font-size: 35px;
-            display: grid;
-            word-break: break-word;
-            white-space: pre-wrap;
-        }
+        .message { margin: 0; font-size: 35px; display: grid; word-break: break-word; white-space: pre-wrap; }
 
-        .single-image {
-            margin: 10px 20px 20px 0;
-            border-radius: 15px;
-            max-width: 500px;
-            max-height: 500px;
-        }
+        .single-image { margin: 10px 20px 20px 0; border-radius: 15px; max-width: 500px; max-height: 500px; }
+        .image { margin: 10px; border-radius: 15px; max-width: 500px; max-height: 500px; }
 
-        .image {
-            margin: 10px;
-            border-radius: 15px;
-            max-width: 500px;
-            max-height: 500px;
+        .placeholder {
+            background: repeating-linear-gradient(45deg, #eee, #eee 10px, #f8f8f8 10px, #f8f8f8 20px);
         }
     </style>
 </body>
-
 </html>

@@ -1,0 +1,27 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  qq-quote-generator:
+    build: .
+    image: qq-quote-generator:latest
+    container_name: qq-quote-generator
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # --- Gunicorn & App Performance ---
+      - GUNICORN_WORKERS=2          # Gunicorn worker processes (adjust based on CPU cores)
+      - WORKER_POOL_SIZE=2          # Firefox browser worker pool size
+      - WORKER_ACQUIRE_TIMEOUT_SEC=60 # Max time to wait for a free browser worker
+
+      # --- GIF/APNG Tuning (optional) ---
+      # - TIMELINE_MAX_SECONDS=60     # Max animation length to prevent memory bombs
+      # - GIF_MIN_DELAY_MS=20         # GIF minimum frame delay
+      - USE_GIFSICLE=1              # Enable gifsicle optimization (1=yes, 0=no)
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
