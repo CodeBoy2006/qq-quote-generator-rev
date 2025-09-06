@@ -259,15 +259,14 @@ def compose_animation_event_driven(
             )
             return bio.getvalue()
         # APNG（单帧）
-    with tempfile.TemporaryDirectory() as td:
-        tmp = os.path.join(td, "one.apng")
-        ap = APNGAsmBinder()
-        buf = io.BytesIO()
-        base.convert("RGBA").save(buf, format="PNG")
-        ap.add_frame_from_png(buf.getvalue(), delay_num=100, delay_den=1000)
-        ap.set_loops(0)
-        ap.assemble(tmp)
-        return open(tmp, "rb").read()
+        with tempfile.TemporaryDirectory() as td:
+            tmp = os.path.join(td, "one.apng")
+            ap = APNGAsmBinder()
+            ap.add_frame_from_pillow(base.convert("RGBA"), delay_num=100, delay_den=1000)
+            ap.set_loops(0)
+            ap.assemble(tmp)
+            return open(tmp, "rb").read()
+
     # 统一刻度：全局分母 G
     G = _build_global_denominator(assets)
     _fill_ticks_with_G(assets, G)
