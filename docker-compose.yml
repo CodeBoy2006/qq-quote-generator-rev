@@ -2,10 +2,10 @@
 version: '3.8'
 
 services:
-  qq-quote-generator:
+  qq-quote-generator-rev:
     build: .
-    image: qq-quote-generator:latest
-    container_name: qq-quote-generator
+    image: qq-quote-generator-rev:latest
+    container_name: qq-quote-generator-rev
     restart: unless-stopped
     ports:
       - "5000:5000"
