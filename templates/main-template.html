@@ -1,164 +1,139 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QQ对话生成界面</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>QQ对话生成界面</title>
 </head>
 
 <body>
-    <div id="app">
-        {% for index in data_list %}
-        <div class="dialog">
-            <img src="https://q1.qlogo.cn/g?b=qq&nk={{index.user_id}}&s=640" class="avatar"></img>
-            <div>
-                <p class="nickname">{{index.user_nickname}}</p>
-                {% if index.image | length == 1 and index.message is not defined and index.reply is not defined %}
-                        <img src="{{index.image[0]}}" class="single-image"></img>
-                {% else %}
-                <div class="body">
-                    {% if index.reply is defined %}
-                    <div class="reply">
-                        <div class="reply-first">
-                            <p>{{index.reply.user_nickname}}</p>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="currentColor" d="M3.5 2a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9Zm4.854 2.146a.5.5 0 0 0-.708 0l-3.5 3.5a.5.5 0 1 0 .708.708L7.5 5.707V13.5a.5.5 0 0 0 1 0V5.707l2.646 2.647a.5.5 0 0 0 .708-.708l-3.5-3.5Z"/></svg>
-                        </div>
-                        <div>
-                            {% if index.reply.message is defined %}
-                            <p class="reply-message">{{index.reply.message}}</p>
-                            {% endif %}
-                            {% if index.reply.image is defined %}
-                            <img src="{{index.reply.image}}" class="image"></img>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
-                    <div class="message">
-                        {% if index.message is defined %}
-                        <p style="display: inline-block;">{{index.message}}</p>
-                        {% endif %}
-                        {% if index.image is defined %}
-                        {% for image in index.image %}
-                        <img src="{{image}}" class="image"></img>
-                        {% endfor %}
-                        {% endif %}
-                    </div>
+  <div id="app">
+    {% for index in data_list %}
+    {% set outer_i = loop.index %}
+    {% set imgs = index.image if index.image is defined else [] %}
+    <div class="dialog">
+      <!-- 头像：使用占位 div + data-src；渲染器会记录坐标并在后端贴图 -->
+      <div
+        class="placeholder avatar"
+        data-src="https://q1.qlogo.cn/g?b=qq&nk={{ index.user_id }}&s=640"
+        data-eltid="avatar-{{ outer_i }}">
+      </div>
+
+      <div>
+        <p class="nickname">{{ index.user_nickname }}</p>
+
+        {% if imgs|length == 1 and index.message is not defined and index.reply is not defined %}
+          <!-- 只有一张图的简化形态 -->
+          <div
+            class="placeholder single-image"
+            data-src="{{ imgs[0] }}"
+            data-eltid="single-image-{{ outer_i }}">
+          </div>
+        {% else %}
+          <div class="body">
+            {% if index.reply is defined %}
+              <div class="reply">
+                <div class="reply-first">
+                  <p>{{ index.reply.user_nickname }}</p>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                       viewBox="0 0 16 16"><path fill="currentColor"
+                       d="M3.5 2a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9Zm4.854 2.146a.5.5 0 0 0-.708 0l-3.5 3.5a.5.5 0 1 0 .708.708L7.5 5.707V13.5a.5.5 0 0 0 1 0V5.707l2.646 2.647a.5.5 0 0 0 .708-.708l-3.5-3.5Z"/></svg>
                 </div>
-                {% endif %}
+                <div>
+                  {% if index.reply.message is defined %}
+                    <p class="reply-message">{{ index.reply.message }}</p>
+                  {% endif %}
+                  {% if index.reply.image is defined %}
+                    <div class="placeholder image"
+                         data-src="{{ index.reply.image }}"
+                         data-eltid="reply-image-{{ outer_i }}">
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
+
+            <div class="message">
+              {% if index.message is defined %}
+                <p style="display:inline-block;">{{ index.message }}</p>
+              {% endif %}
+
+              {% for image in imgs %}
+                <div class="placeholder image"
+                     data-src="{{ image }}"
+                     data-eltid="msg-image-{{ index.user_id }}-{{ loop.index }}">
+                </div>
+              {% endfor %}
             </div>
-        </div>
-        {% endfor %}
+          </div>
+        {% endif %}
+      </div>
     </div>
+    {% endfor %}
+  </div>
 
+  <style>
+    #app {
+      font-family: 'MiSans','OPlusSans 3.0','Noto Color Emoji',system-ui,-apple-system,
+                   BlinkMacSystemFont,'Segoe UI','Noto Serif Regular',Roboto,Oxygen,Ubuntu,
+                   Cantarell,'Open Sans','Helvetica Neue',sans-serif;
+      background-color: #F1F1F1;
+      width: fit-content;
+      padding: 10px;
+      max-width: 800px;
+    }
 
-    <style>
-        #app {
-            font-family: 'MiSans', 'OPlusSans 3.0', 'Noto Color Emoji', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Serif Regular', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            background-color: #F1F1F1;
-            width: fit-content;
-            padding: 10px;
-            max-width: 800px;
-        }
+    .dialog { display: flex; }
+    p { margin: 0; padding: 0; }
 
-        .dialog {
-            display: flex;
-        }
+    /* 占位元素必须占据目标大小，否则后端贴图会拉伸或错位 */
+    .placeholder { display: inline-block; }
 
-        p {
-            margin: 0;
-            padding: 0;
-        }
+    .avatar {
+      width: 100px; height: 100px;
+      border-radius: 50%;
+      margin: 20px;
+      flex-shrink: 0;
+    }
 
-        .avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            margin: 20px;
-        }
+    .nickname {
+      color: #9497A3;
+      height: 20px; font-size: 25px;
+      padding: 5px; margin: 25px; margin-left: 0;
+    }
 
-        .nickname {
-            color: #9497A3;
-            height: 20px;
-            font-size: 25px;
-            padding: 5px;
-            margin: 25px;
-            margin-left: 0px;
-        }
+    .body {
+      background-color: #fff;
+      padding: 20px; border-radius: 10px;
+      width: fit-content;
+      margin: 15px; margin-left: 0;
+    }
 
-        .body {
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            width: fit-content;
-            margin: 15px;
-            margin-left: 0;
-        }
+    .reply {
+      background-color: #F5F5F5;
+      padding: 10px; border-radius: 10px;
+      align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
 
-        .reply {
-            background-color: #F5F5F5;
-            padding: 10px;
-            border-radius: 10px;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-        }
+    .reply-first { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+    .reply-first p { float: left; font-size: 25px; max-width: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .reply-first svg { width: 30px; height: 30px; padding-top: 3px; }
 
-        .reply-first {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 5px;
-        }
+    .reply-message {
+      display: block; font-size: 30px; white-space: pre-wrap;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+      overflow: hidden; text-overflow: ellipsis;
+    }
 
-        .reply-first p {
-            float: left;
-            font-size: 25px;
-            max-width: inherit;
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-        }
+    .message { margin: 0; font-size: 35px; display: grid; word-break: break-word; white-space: pre-wrap; }
 
-        .reply-first svg {
-            width: 30px;
-            height: 30px;
-            padding-top: 3px;
-        }
-
-        .reply-message {
-            display: block;
-            font-size: 30px;
-            white-space: pre-wrap;
-            display: -webkit-box;
-            -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .message {
-            margin: 0;
-            font-size: 35px;
-            display: grid;
-            word-break: break-word;
-            white-space: pre-wrap;
-        }
-
-        .single-image {
-            margin: 10px 20px 20px 0;
-            border-radius: 15px;
-            max-width: 500px;
-            max-height: 500px;
-        }
-
-        .image {
-            margin: 10px;
-            border-radius: 15px;
-            max-width: 500px;
-            max-height: 500px;
-        }
-    </style>
+    /* 单图与普通图块：给出“盒子尺寸”，后端用 contain 适配等比缩放 */
+    .single-image, .image {
+      margin: 10px; border-radius: 15px;
+      width: 500px; height: 500px;         /* 可按需调整默认画布 */
+    }
+    .single-image { margin: 10px 20px 20px 0; }
+  </style>
 </body>
-
 </html>
