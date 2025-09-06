@@ -1,10 +1,13 @@
 import io
 import math
+import hashlib
 import requests
 from typing import Dict, Tuple, List
 
 from PIL import Image, ImageSequence, ImageDraw, ImageChops
 
+
+# ------------- 基础工具 -------------
 def _is_animated(img: Image.Image) -> bool:
     return getattr(img, "is_animated", False) and getattr(img, "n_frames", 1) > 1
 
@@ -31,7 +34,6 @@ def _make_mask(size: Tuple[int, int], radius: int = 0, shape: str = 'rect') -> I
 def _fit_frame(frame_rgba: Image.Image, box_w: int, box_h: int, fit: str) -> Image.Image:
     """
     返回一个 (box_w, box_h) 的 RGBA 画布，按 contain/cover 规则放置 frame_rgba。
-    画布周围留透明“信箱边”或裁切到满。
     """
     W, H = frame_rgba.size
     if W == 0 or H == 0:
@@ -50,8 +52,6 @@ def _fit_frame(frame_rgba: Image.Image, box_w: int, box_h: int, fit: str) -> Ima
     left = (box_w - nw) // 2
     top  = (box_h - nh) // 2
     canvas.alpha_composite(resized, (left, top))
-
-    # 若 cover 尺寸超过盒子（理论上不会，因为我们放在更大画布），这里不再另行裁切
     return canvas
 
 def _apply_mask_keep_alpha(rgba: Image.Image, mask: Image.Image) -> Image.Image:
@@ -73,8 +73,16 @@ def _prepare_slot(frame: Image.Image, geom: Tuple[int, int, int, int], fit: str,
     slot = _apply_mask_keep_alpha(slot, mask)
     return slot
 
+def _hash_rgba(img: Image.Image) -> bytes:
+    """对 RGBA 图像做内容哈希，用于帧去重（无损）"""
+    if img.mode != 'RGBA':
+        img = img.convert('RGBA')
+    return hashlib.md5(img.tobytes()).digest()
+
+
+# ------------- 输出：静态 PNG -------------
 def compose_png(background_png_bytes: bytes, layout: Dict) -> bytes:
-    """动图取首帧，叠到背景上，输出静态 PNG（支持圆角/圆形，contain/cover）"""
+    """动图取首帧，叠到背景上，输出静态 PNG（支持圆角/圆形，contain/cover），无损压缩"""
     bg = Image.open(io.BytesIO(background_png_bytes)).convert('RGBA')
     canvas = bg.copy()
 
@@ -95,16 +103,17 @@ def compose_png(background_png_bytes: bytes, layout: Dict) -> bytes:
         canvas.alpha_composite(slot, (x, y))
 
     out = io.BytesIO()
-    canvas.save(out, format='PNG', optimize=True)
+    # 无损压缩：optimize + compress_level=9
+    canvas.save(out, format='PNG', optimize=True, compress_level=9)
     return out.getvalue()
 
-def compose_apng(background_png_bytes: bytes, layout: Dict) -> bytes:
+
+# ------------- 共享：合成帧序列（供 APNG / WebP 共用）-------------
+def _compose_frames(background_png_bytes: bytes, layout: Dict) -> Tuple[List[Image.Image], List[int]]:
     """
-    多动图叠加导出 APNG。
-    - 静态图：转为单帧（超长时长）；
-    - 动图：逐帧展开，保留各自帧间隔；
-    - 输出帧间隔为所有帧时长的 gcd，时轴齐步推进；
-    - 圆角/圆形 + contain/cover 生效。
+    返回 (frames_out, durations_out)：
+      - 若全静态：frames=[单帧]、durations=[1000]
+      - 若存在动图：合成动画帧并按 GCD 采样；相邻相同帧去重并合并时长
     """
     bg = Image.open(io.BytesIO(background_png_bytes)).convert('RGBA')
 
@@ -124,34 +133,33 @@ def compose_apng(background_png_bytes: bytes, layout: Dict) -> bytes:
             'img': img
         })
 
-    # 全静态 → 退化为 PNG
+    # 全静态 → 直接生成一帧
     if all(not _is_animated(it['img']) for it in items):
-        return compose_png(background_png_bytes, layout)
+        canvas = bg.copy()
+        for a in items:
+            x, y, w, h = a['geom']
+            slot = _prepare_slot(a['img'], (x, y, w, h), a['fit'], a['radius'], a['shape'])
+            canvas.alpha_composite(slot, (x, y))
+        return [canvas], [1000]  # 单帧：持续 1s（值对 PNG 无意义，对 WebP 动画判断安全）
 
     # 展开动画
     anims = []
     for it in items:
         img = it['img']
-        geom = it['geom']
-        fit = it['fit']
-        radius = it['radius']
-        shape = it['shape']
-
         if _is_animated(img):
             frames, durations = [], []
             for f in ImageSequence.Iterator(img):
                 fr = f.convert('RGBA')
                 frames.append(fr)
-                # Pillow 的 duration 单位是毫秒；兜底 100ms
                 durations.append(max(10, int(f.info.get('duration', img.info.get('duration', 100)))))
             total = sum(durations)
         else:
-            frames = [img.convert('RGBA')]
-            durations = [10 ** 9]  # 近似“无限长”，只为对齐用
+            frames = [it['img'].convert('RGBA')]
+            durations = [10 ** 9]  # 近似“无限长”
             total = durations[0]
 
         anims.append({
-            'geom': geom, 'fit': fit, 'radius': radius, 'shape': shape,
+            'geom': it['geom'], 'fit': it['fit'], 'radius': it['radius'], 'shape': it['shape'],
             'frames': frames, 'durations': durations, 'total': total
         })
 
@@ -164,13 +172,15 @@ def compose_apng(background_png_bytes: bytes, layout: Dict) -> bytes:
 
     base = gcd_list([d for a in anims for d in a['durations']])
 
-    # 总时长（避免失控：限制在 15s 内；没有循环信息就给个默认 4s）
+    # 总时长上限（避免过大），无循环信息时默认 4s，上限 15s
     total_ms_candidates = []
     for a in anims:
         total_ms_candidates.append(a['total'] if a['total'] < 10 ** 8 else 4000)
     total_ms = min(max(total_ms_candidates or [4000]), 15000)
 
     frames_out, durations_out = [], []
+    last_hash = None
+
     t = 0
     while t < total_ms:
         canvas = bg.copy()
@@ -194,12 +204,34 @@ def compose_apng(background_png_bytes: bytes, layout: Dict) -> bytes:
             slot = _prepare_slot(f, (x, y, w, h), fit, radius, shape)
             canvas.alpha_composite(slot, (x, y))
 
-        frames_out.append(canvas)
-        durations_out.append(base)
+        # 相邻帧去重：完全一致则合并时长
+        hsh = _hash_rgba(canvas)
+        if last_hash is not None and hsh == last_hash:
+            durations_out[-1] += base
+        else:
+            frames_out.append(canvas)
+            durations_out.append(base)
+            last_hash = hsh
+
         t += base
 
+    return frames_out, durations_out
+
+
+# ------------- 输出：APNG -------------
+def compose_apng(background_png_bytes: bytes, layout: Dict) -> bytes:
+    """
+    多动图叠加导出 APNG（无损），开启 PNG 优化与高压缩等级，并做帧去重。
+    """
+    frames_out, durations_out = _compose_frames(background_png_bytes, layout)
+
+    # 单帧 → 退化为 PNG
+    if len(frames_out) == 1:
+        buf = io.BytesIO()
+        frames_out[0].save(buf, format='PNG', optimize=True, compress_level=9)
+        return buf.getvalue()
+
     out = io.BytesIO()
-    # 用 PNG 编码 + save_all 形成 APNG（Pillow 支持）
     frames_out[0].save(
         out,
         format='PNG',
@@ -207,6 +239,40 @@ def compose_apng(background_png_bytes: bytes, layout: Dict) -> bytes:
         append_images=frames_out[1:],
         duration=durations_out,
         loop=0,
-        optimize=False
+        optimize=True,          # 开启帧内优化
+        compress_level=9        # 最高压缩（无损）
     )
+    return out.getvalue()
+
+
+# ------------- 输出：WebP（静态/动图，lossless）-------------
+def compose_webp(background_png_bytes: bytes, layout: Dict) -> bytes:
+    """
+    生成 WebP（尽量无损）：
+      - 静态：lossless=True, quality=100, method=6
+      - 动图：同上，save_all=True 并携带帧时长
+    """
+    frames_out, durations_out = _compose_frames(background_png_bytes, layout)
+
+    out = io.BytesIO()
+    if len(frames_out) == 1:
+        frames_out[0].save(
+            out,
+            format='WEBP',
+            lossless=False,
+            quality=85,
+            method=6
+        )
+    else:
+        frames_out[0].save(
+            out,
+            format='WEBP',
+            save_all=True,
+            append_images=frames_out[1:],
+            duration=durations_out,
+            loop=0,
+            lossless=True,
+            quality=100,
+            method=6
+        )
     return out.getvalue()

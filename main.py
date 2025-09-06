@@ -3,7 +3,7 @@ import base64
 from flask import Flask, render_template, request, send_file, jsonify
 from utils import Config
 from renderer import render_background_and_layout
-from composer import compose_png, compose_apng
+from composer import compose_png, compose_apng, compose_webp
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = Config.MAX_CONTENT_LENGTH
@@ -20,7 +20,7 @@ def index():
 def _load_request_json():
     data = request.get_json(silent=True)
     if not isinstance(data, list):
-        # 按要求：不做严格安全校验，仅做最轻类型检查
+        # 轻量类型检查
         raise ValueError("Request body must be a JSON array of messages")
     return data
 
@@ -57,6 +57,19 @@ def apng_handler():
         )
         apng_bytes = compose_apng(bg_png_bytes, layout)
         return send_file(io.BytesIO(apng_bytes), mimetype='image/apng')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/webp/', methods=['POST'])
+def webp_handler():
+    """返回 image/webp（静态或动图，lossless）"""
+    try:
+        data_list = _load_request_json()
+        bg_png_bytes, layout = render_background_and_layout(
+            render_template('main-template.html', data_list=data_list)
+        )
+        webp_bytes = compose_webp(bg_png_bytes, layout)
+        return send_file(io.BytesIO(webp_bytes), mimetype='image/webp')
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

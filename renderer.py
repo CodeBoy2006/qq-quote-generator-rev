@@ -68,10 +68,8 @@ class PlaywrightRenderer:
 
             self.page.set_viewport_size({'width': width, 'height': 600})
 
-            data_url = f"data:text/html;charset=utf-8;base64,{base64.b64encode(html_str.encode('utf-8')).decode('ascii')}"
-            self.page.goto(data_url, wait_until='networkidle')
-            self.page.wait_for_load_state('domcontentloaded')
-            self.page.wait_for_timeout(400)
+            # 直接注入 HTML，比 data:URL 更快；模板无外链资源，等待 DOMContentLoaded 即可
+            self.page.set_content(html_str, wait_until='domcontentloaded')
 
             content_height = self.page.evaluate("""
                 () => {
@@ -85,7 +83,6 @@ class PlaywrightRenderer:
             actual_height = max(Config.MIN_VIEWPORT_HEIGHT, min(actual_height, Config.MAX_VIEWPORT_HEIGHT))
 
             self.page.set_viewport_size({'width': width, 'height': actual_height})
-            self.page.wait_for_timeout(100)
 
             layout_items = self._extract_placeholder_layout()
 
