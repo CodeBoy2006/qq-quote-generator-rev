@@ -1,103 +1,60 @@
-# QQ Quote Generator (Revised)
+# qq-quote-generator
 
-基于 Flask + Playwright 的 QQ 对话生成器，支持静态图片和动图合成。
+一个基于 headless firefox 实现的低性能 qq 聊天语录图片生成 api，灵感来源于 telegram 的 [quote-bot](https://github.com/LyoSU/quote-bot)。
 
-## 特性
+![](./assets/star.png)
 
-- 使用 Playwright 渲染 HTML 模板生成高质量背景图
-- 支持动态合成多个 GIF/APNG 动图
-- 提供 PNG、APNG 和 Base64 输出格式
-- 无需编译 C++/Rust 代码，纯 Python 实现
+## Quick Start
 
-## 安装
-
-### 本地开发
-
-1. 安装 Python 依赖：
-```bash
-pip install -r requirements.txt
-```
-
-2. 安装 Playwright 浏览器：
-```bash
-python setup_playwright.py
-# 或手动运行：
-python -m playwright install chromium
-```
-
-3. 启动服务：
-```bash
-python main.py
-```
-
-### Docker 部署
+### Docker
 
 ```bash
-# 构建镜像
-docker build -t qq-quote-generator .
-
-# 运行容器
-docker run -p 5000:5000 qq-quote-generator
+docker run -d \
+  --name qq-quote-generator \
+  --restart unless-stopped \
+  -p 5000:5000 \
+  zhullyb/qq-quote-generator
 ```
 
-## API 接口
+### 请求示例
 
-### POST /png/
-返回静态 PNG 图片（动图取首帧）
-
-### POST /apng/
-返回 APNG 动画图片
-
-### POST /base64/
-返回 PNG 的 Base64 编码
-
-### GET/POST /quote/
-预览 HTML 模板（调试用）
-
-## 请求格式
-
-所有 POST 接口接受 JSON 数组格式的消息数据：
-
-```json
-[
-  {
-    "user_id": "123456",
-    "user_nickname": "用户昵称",
-    "message": "消息内容",
-    "image": ["https://example.com/image1.gif", "https://example.com/image2.png"],
-    "reply": {
-      "user_nickname": "回复的用户",
-      "message": "被回复的消息",
-      "image": "https://example.com/reply.gif"
-    }
-  }
-]
-```
-
-## 技术架构
-
-- **渲染引擎**: Playwright (Chromium) - 替代原生 C++ 渲染器
-- **图像处理**: Pillow - 处理静态图和动图合成
-- **Web 框架**: Flask - 提供 HTTP API
-
-## 性能说明
-
-- Playwright 渲染器使用单例模式，复用浏览器实例以提高性能
-- 首次请求需要初始化浏览器，后续请求会快很多
-- 建议使用 gunicorn 配合少量 worker 以避免内存占用过高
-
-## 故障排除
-
-如果遇到 Playwright 相关错误：
-
-1. 确保已安装 Chromium：
 ```bash
-python -m playwright install chromium
+curl -X POST http://127.0.0.1:5000/png \
+  -H "Content-Type: application/json" \
+  -d '[{"user_id": 5435486,"user_nickname": "竹林里有冰","message": "请大家多多 star 本项目！"}]' \
+  -o demo.png 
 ```
 
-2. Linux 系统需要安装依赖：
-```bash
-python -m playwright install-deps chromium
+## 更多样式
+
+qq-quote-generator 针对纯文本、纯图片、图片+文本（或多图片）三种类型的消息做了不同的样式处理，且支持在一张图上连续生成多条消息以求达到更好的模拟效果。生成如下示例图的的 json 字段可参考 [data_example.json](./assets/data_example.json)。
+
+传入的图片链接可以是能够被 Firefox 访问的公开图床，也可以是图片的 base64 编码，只需要能够被浏览器的 `<img>` 标签所识别即可。
+
+![](./assets/example.png)
+
+## 工作原理
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Flask
+    participant Jinja2
+    participant Selenium
+    participant Firefox
+
+    Client->>Flask: 发送请求 (附带数据)
+    Flask->>Jinja2:  渲染模板生成临时网页
+    Jinja2-->>Flask: 返回网页 url
+    Flask->>Selenium: 利用 Headless Firefox 访问网页
+    Selenium->>Firefox: 加载临时网页
+    Firefox-->>Selenium: 渲染完成
+    Selenium->>Flask:  截图并返回
+    Flask->>Client: 返回截图
+
 ```
 
-3. 检查是否有足够的内存（至少 512MB）
+## Breaking Change:
+
+- 0.0.7:
+  - 将请求路径移至 /png/ 及 /base64/ 用以区分返回类型，/ 路径被弃用
