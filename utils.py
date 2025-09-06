@@ -21,9 +21,13 @@ class Config:
     CACHE_TTL_SECONDS = int(os.environ.get('CACHE_TTL_SECONDS', 300))   # 缓存 5 分钟
     CACHE_MAX_ENTRIES = int(os.environ.get('CACHE_MAX_ENTRIES', 256))
 
-    # 动画总时长上限（毫秒），避免超长动图生成巨量帧；仍“尽量无损”地抽关键变更点
+    # 动画总时长上限（毫秒），避免超长动图生成巨量帧
     MAX_ANIM_TOTAL_MS = int(os.environ.get('MAX_ANIM_TOTAL_MS', 10000))  # 10s 上限
     DEFAULT_STATIC_FRAME_MS = int(os.environ.get('DEFAULT_STATIC_FRAME_MS', 1000))
 
     # 重采样算法：LANCZOS 画质更好但稍慢；BILINEAR 更快
-    RESAMPLE = os.environ.get('RESAMPLE', 'LANCZOS').upper()  # 'LANCZOS' 或 'BILINEAR'
+    RESAMPLE = os.environ.get('RESAMPLE', 'BILINEAR').upper()  # 'LANCZOS' 或 'BILINEAR'
+
+    # ====== 新增：Playwright 页面池大小 ======
+    # 决定了可以同时处理多少个渲染任务。建议值为 CPU 核心数。
+    PLAYWRIGHT_POOL_SIZE = int(os.environ.get('PLAYWRIGHT_POOL_SIZE', 2))
