@@ -2,14 +2,21 @@ import io
 import base64
 from flask import Flask, render_template, request, send_file, jsonify
 from utils import Config
-from renderer import render_background_and_layout
+
+# 1. Import the new initialization function
+from renderer import render_background_and_layout, initialize_playwright_pool
 from composer import compose_png, compose_apng, compose_webp
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = Config.MAX_CONTENT_LENGTH
 
+# 2. Initialize the pool right after creating the Flask app instance
+# This ensures it's ready before the server starts accepting requests.
+initialize_playwright_pool()
+
 @app.after_request
 def set_headers(response):
+    # ... (rest of the file is identical)
     response.headers["Referrer-Policy"] = "no-referrer"
     return response
 
@@ -20,7 +27,6 @@ def index():
 def _load_request_json():
     data = request.get_json(silent=True)
     if not isinstance(data, list):
-        # 轻量类型检查
         raise ValueError("Request body must be a JSON array of messages")
     return data
 
@@ -35,6 +41,8 @@ def png_handler():
         return send_file(io.BytesIO(png_bytes), mimetype='image/png')
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# ... (all other routes are identical) ...
 
 @app.route('/base64/', methods=['POST'])
 def base64_handler():
@@ -62,7 +70,6 @@ def apng_handler():
 
 @app.route('/webp/', methods=['POST'])
 def webp_handler():
-    """返回 image/webp（静态或动图，lossless）"""
     try:
         data_list = _load_request_json()
         bg_png_bytes, layout = render_background_and_layout(
@@ -81,5 +88,7 @@ def quote_preview():
         data_list = []
     return render_template('main-template.html', data_list=data_list)
 
+
 if __name__ == '__main__':
+    # The initialization is now done above, before the server loop starts
     app.run(host='0.0.0.0', port=Config.FLASK_RUN_PORT, debug=Config.FLASK_DEBUG)
